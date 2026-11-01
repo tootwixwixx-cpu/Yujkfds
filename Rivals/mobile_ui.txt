@@ -562,7 +562,45 @@ end
 --// CONTAINED CARD BUILDER
 --//==================================================
 
+local function findCardByTitle(page, title)
+    if not page then return nil, nil end
+    local cardName = title .. "Card"
+    local lowerCardName = string.lower(cardName)
+    local lowerTitle = string.lower(title)
+
+    local direct = page:FindFirstChild(cardName, true)
+    if direct and direct:IsA("Frame") then
+        local body = direct:FindFirstChild("Body")
+        if body then return direct, body end
+    end
+
+    for _, desc in ipairs(page:GetDescendants()) do
+        if desc:IsA("Frame") and (desc.Name == cardName or string.lower(desc.Name) == lowerCardName) then
+            local body = desc:FindFirstChild("Body")
+            if body then return desc, body end
+        end
+    end
+
+    for _, desc in ipairs(page:GetDescendants()) do
+        if desc:IsA("TextLabel") and string.lower(desc.Text or "") == lowerTitle then
+            local p = desc.Parent
+            while p and p ~= page do
+                if p:IsA("Frame") and p:FindFirstChild("Body") then
+                    return p, p:FindFirstChild("Body")
+                end
+                p = p.Parent
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 local function createMobileCard(page, title, side)
+    local existingCard, existingBody = findCardByTitle(page, title)
+    if existingCard and existingBody then
+        return existingCard, existingBody
+    end
     local pageLayout = PageColumns[page]
     local cardParent = page
     if pageLayout then
@@ -1751,8 +1789,16 @@ function AtomwareMobileWindow:AddTab(rawName, order)
         return self:AddTab("misc")
     end
     local displayName, icon = normalizeTabName(rawName)
-    local existing = self.tabs[rawName] or self.tabs[displayName]
-    if existing then return existing end
+    local lowerRaw = string.lower(rawName or "")
+    local lowerDisplay = string.lower(displayName or "")
+    local existing = self.tabs[rawName] or self.tabs[lowerRaw] or self.tabs[displayName] or self.tabs[lowerDisplay]
+    if existing then
+        self.tabs[rawName] = existing
+        self.tabs[lowerRaw] = existing
+        self.tabs[displayName] = existing
+        self.tabs[lowerDisplay] = existing
+        return existing
+    end
 
     local page = getOrCreatePage(displayName)
 
@@ -1785,8 +1831,17 @@ function AtomwareMobileWindow:AddTab(rawName, order)
 
     function tabObj:AddSection(text, side, order)
         local sKey = string.lower(text or "")
+        tabObj.sectionMap = tabObj.sectionMap or {}
         if tabObj.sectionMap[sKey] then
             return tabObj.sectionMap[sKey]
+        end
+        local existingCard, existingBody = findCardByTitle(page, text)
+        if existingCard and existingBody then
+            local section = wrapMobileSection(existingCard, existingBody, text)
+            section.tab = tabObj
+            section.parentTab = tabObj
+            tabObj.sectionMap[sKey] = section
+            return section
         end
         local card, body = createMobileCard(page, text, side)
         local section = wrapMobileSection(card, body, text)
@@ -1804,7 +1859,9 @@ function AtomwareMobileWindow:AddTab(rawName, order)
     end
 
     self.tabs[rawName] = tabObj
+    self.tabs[lowerRaw] = tabObj
     self.tabs[displayName] = tabObj
+    self.tabs[lowerDisplay] = tabObj
     return tabObj
 end
 

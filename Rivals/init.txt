@@ -453,8 +453,12 @@ _G.AtomwareIsLiteMode = isLiteMode
 -- 3. Direct TestFork GitHub loader with dynamic cache-busting & path resolution
 -- 4. Local Filesystem fallback
 -- =========================================================================
+local loadedModuleRegistry = {}
 local function loadModule(path)
     local cleanName = path:gsub("%.lua$", ""):gsub("%.txt$", "")
+    if loadedModuleRegistry[cleanName] then
+        return true
+    end
     local candidates = {
         cleanName,
         cleanName .. ".txt",
@@ -477,7 +481,10 @@ local function loadModule(path)
                 or __VFS_MODULES["rivals/" .. name]
             if loader then
                 local ok, resOrErr = pcall(loader)
-                if ok then return true end
+                if ok then
+                    loadedModuleRegistry[cleanName] = true
+                    return true
+                end
                 warn("[Atomware Rivals] Failed to execute in-memory module " .. name .. ":", resOrErr)
             end
         end
@@ -488,6 +495,7 @@ local function loadModule(path)
         for _, name in ipairs(candidates) do
             local ok, res = pcall(require, name)
             if ok and res ~= nil then
+                loadedModuleRegistry[cleanName] = true
                 return true
             end
         end
@@ -513,9 +521,11 @@ local function loadModule(path)
             if okTest and testSource and #testSource > 0 and not testSource:find("404: Not Found") and not testSource:find("<!DOCTYPE") then
                 local compileOk, chunk, compileErr = pcall(loadstring, testSource)
                 if compileOk and chunk then
+                    loadedModuleRegistry[cleanName] = true
                     local runOk, runErr = pcall(chunk)
                     if runOk then return true end
                     warn("[Atomware Rivals] Error running module (" .. gitPath .. "):", runErr)
+                    return false
                 else
                     warn("[Atomware Rivals] Error compiling module (" .. gitPath .. "):", compileErr)
                 end
@@ -532,9 +542,11 @@ local function loadModule(path)
                 if okFs and type(src) == "string" and #src > 0 then
                     local compileOk, chunk = pcall(loadstring, src)
                     if compileOk and chunk then
+                        loadedModuleRegistry[cleanName] = true
                         local runOk, runErr = pcall(chunk)
                         if runOk then return true end
                         warn("[Atomware Rivals] Error executing local module " .. pfx .. name .. ":", runErr)
+                        return false
                     end
                 end
             end

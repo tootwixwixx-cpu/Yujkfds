@@ -470,7 +470,45 @@ end
 --// WIDGET BUILDERS & CARDS
 --//==================================================
 
+local function findCardByTitle(page, title)
+    if not page then return nil, nil end
+    local cardName = title .. "Card"
+    local lowerCardName = string.lower(cardName)
+    local lowerTitle = string.lower(title)
+
+    local direct = page:FindFirstChild(cardName, true)
+    if direct and direct:IsA("Frame") then
+        local body = direct:FindFirstChild("Body")
+        if body then return direct, body end
+    end
+
+    for _, desc in ipairs(page:GetDescendants()) do
+        if desc:IsA("Frame") and (desc.Name == cardName or string.lower(desc.Name) == lowerCardName) then
+            local body = desc:FindFirstChild("Body")
+            if body then return desc, body end
+        end
+    end
+
+    for _, desc in ipairs(page:GetDescendants()) do
+        if desc:IsA("TextLabel") and string.lower(desc.Text or "") == lowerTitle then
+            local p = desc.Parent
+            while p and p ~= page do
+                if p:IsA("Frame") and p:FindFirstChild("Body") then
+                    return p, p:FindFirstChild("Body")
+                end
+                p = p.Parent
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 local function createCard(page, title, side)
+    local existingCard, existingBody = findCardByTitle(page, title)
+    if existingCard and existingBody then
+        return existingCard, existingBody
+    end
     local pageLayout = PageColumns[page]
     local cardParent = page
     if pageLayout then
@@ -1463,8 +1501,17 @@ function AtomwareWindow:AddTab(rawName, order)
 
     function tabObj:AddSection(text, side, order)
         local sKey = string.lower(text or "")
+        tabObj.sectionMap = tabObj.sectionMap or {}
         if tabObj.sectionMap[sKey] then
             return tabObj.sectionMap[sKey]
+        end
+        local existingCard, existingBody = findCardByTitle(page, text)
+        if existingCard and existingBody then
+            local section = wrapSection(existingCard, existingBody, text)
+            section.tab = tabObj
+            section.parentTab = tabObj
+            tabObj.sectionMap[sKey] = section
+            return section
         end
         local card, body = createCard(page, text, side)
         local section = wrapSection(card, body, text)

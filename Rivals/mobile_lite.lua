@@ -789,7 +789,45 @@ setmetatable(mockTabObj, {
 --// CONTAINED CARD BUILDER
 --//==================================================
 
+local function findCardByTitle(page, title)
+    if not page then return nil, nil end
+    local cardName = title .. "Card"
+    local lowerCardName = string.lower(cardName)
+    local lowerTitle = string.lower(title)
+
+    local direct = page:FindFirstChild(cardName, true)
+    if direct and direct:IsA("Frame") then
+        local body = direct:FindFirstChild("Body")
+        if body then return direct, body end
+    end
+
+    for _, desc in ipairs(page:GetDescendants()) do
+        if desc:IsA("Frame") and (desc.Name == cardName or string.lower(desc.Name) == lowerCardName) then
+            local body = desc:FindFirstChild("Body")
+            if body then return desc, body end
+        end
+    end
+
+    for _, desc in ipairs(page:GetDescendants()) do
+        if desc:IsA("TextLabel") and string.lower(desc.Text or "") == lowerTitle then
+            local p = desc.Parent
+            while p and p ~= page do
+                if p:IsA("Frame") and p:FindFirstChild("Body") then
+                    return p, p:FindFirstChild("Body")
+                end
+                p = p.Parent
+            end
+        end
+    end
+
+    return nil, nil
+end
+
 local function createMobileCard(page, title, side)
+    local existingCard, existingBody = findCardByTitle(page, title)
+    if existingCard and existingBody then
+        return existingCard, existingBody
+    end
     local pageLayout = PageColumns[page]
     local cardParent = page
     if pageLayout then
@@ -1957,7 +1995,8 @@ function AtomwareMobileWindow:SwitchPage(name)
 end
 
 function AtomwareMobileWindow:CreateRealTab(displayName, icon)
-    local existing = self.tabs[displayName]
+    local lowerDisplay = string.lower(displayName or "")
+    local existing = self.tabs[displayName] or self.tabs[lowerDisplay]
     if existing then return existing end
 
     local page = getOrCreatePage(displayName)
@@ -2000,6 +2039,14 @@ function AtomwareMobileWindow:CreateRealTab(displayName, icon)
         if tabObj.sectionMap[sKey] then
             return tabObj.sectionMap[sKey]
         end
+        local existingCard, existingBody = findCardByTitle(page, text)
+        if existingCard and existingBody then
+            local section = wrapMobileSection(existingCard, existingBody, text)
+            section.tab = tabObj
+            section.parentTab = tabObj
+            tabObj.sectionMap[sKey] = section
+            return section
+        end
         local card, body = createMobileCard(page, text, side)
         local section = wrapMobileSection(card, body, text)
         section.tab = tabObj
@@ -2018,6 +2065,7 @@ function AtomwareMobileWindow:CreateRealTab(displayName, icon)
     end
 
     self.tabs[displayName] = tabObj
+    self.tabs[string.lower(displayName)] = tabObj
     return tabObj
 end
 
@@ -2053,7 +2101,10 @@ function AtomwareMobileWindow:AddTab(rawName, order)
 
     -- 3. Unified Combat Tab (Combines Silent Aim from Legit and Ragebot from Rage)
     if lower == "combat" then
-        return self.tabs["Combat"] or self:CreateRealTab("Combat", "⚔️")
+        local t = self.tabs["Combat"] or self.tabs["combat"] or self:CreateRealTab("Combat", "⚔️")
+        self.tabs["Combat"] = t
+        self.tabs["combat"] = t
+        return t
     end
 
     if lower == "legit" then

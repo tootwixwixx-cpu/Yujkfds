@@ -1,3 +1,10 @@
+local g = (getgenv and getgenv()) or _G
+if g.__atomware_kicia_mounted or g.AtomwareKiciaAlreadyLoaded then
+    return g.__atomware_kicia_instance or true
+end
+g.__atomware_kicia_mounted = true
+g.AtomwareKiciaAlreadyLoaded = true
+
 --[[
     Atomware Rivals - backend_kicia.lua
     Modular Backend Extension: KiciaHook v3 Engine for Atomware Rivals
@@ -46,6 +53,7 @@ local Kicia = {
     active = true,
     uiMounted = false,
 }
+g.__atomware_kicia_instance = Kicia
 
 local function track(conn)
     table.insert(Kicia.connections, conn)
@@ -511,9 +519,10 @@ end
 --//==================================================
 
 local function mountKiciaUI()
-    if Kicia.uiMounted then return end
+    if g.__atomware_kicia_ui_mounted or Kicia.uiMounted then return end
     local window = _G.AtomwareWindow
     if not window or not window.tabs then return end
+    g.__atomware_kicia_ui_mounted = true
     Kicia.uiMounted = true
 
     local function getTab(name, alt)

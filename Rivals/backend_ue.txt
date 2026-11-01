@@ -1,3 +1,10 @@
+local g = (getgenv and getgenv()) or _G
+if g.__atomware_ue_mounted or g.AtomwareUEAlreadyLoaded then
+    return g.__atomware_ue_instance or true
+end
+g.__atomware_ue_mounted = true
+g.AtomwareUEAlreadyLoaded = true
+
 --[[
     Atomware Rivals - backend_ue.lua
     Modular Backend Extension: Unnamed Enhancements (UE) Engine for Atomware Rivals
@@ -39,6 +46,7 @@ local UE = {
     active = true,
     uiMounted = false,
 }
+g.__atomware_ue_instance = UE
 
 local function track(conn)
     table.insert(UE.connections, conn)
@@ -275,9 +283,10 @@ end
 --//==================================================
 
 local function mountUE_UI()
-    if UE.uiMounted then return end
+    if g.__atomware_ue_ui_mounted or UE.uiMounted then return end
     local window = _G.AtomwareWindow
     if not window or not window.tabs then return end
+    g.__atomware_ue_ui_mounted = true
     UE.uiMounted = true
 
     local function getTab(name, alt)
@@ -290,7 +299,7 @@ local function mountUE_UI()
         local card = combatTab:AddSection("Void Exploits & Anti-Aim", 1)
         if card and card.AddToggle then
             card:AddToggle({ text = "Anti Aim (Spinbot)", state = State.AntiAim, callback = function(v) State.AntiAim = v end })
-            card:AddSlider({ text = "Anti Aim Pitch", min = -89, max = 89, step = 1, default = State.AntiAimPitch, suffix = "°", callback = function(v) State.AntiAimPitch = v end })
+            card:AddSlider({ text = "Anti Aim Pitch", min = -89, max = 89, step = 1, default = State.AntiAimPitch, suffix = " deg", callback = function(v) State.AntiAimPitch = v end })
             card:AddSlider({ text = "Spinbot Rotation Speed", min = 0, max = 36, step = 1, default = State.AntiAimSpinSpeed, callback = function(v) State.AntiAimSpinSpeed = v end })
             card:AddKeybind({ text = "Floor Hide Key", default = State.FloorHideKey, callback = function(k) State.FloorHideKey = typeof(k) == "EnumItem" and k.Name or tostring(k) end })
             card:AddKeybind({ text = "Void Spam Key", default = State.VoidSpamKey, callback = function(k) State.VoidSpamKey = typeof(k) == "EnumItem" and k.Name or tostring(k) end })
