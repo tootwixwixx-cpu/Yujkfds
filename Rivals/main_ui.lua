@@ -141,27 +141,12 @@ local function getGuiParent()
     return playerGui or CoreGui
 end
 
-local targetGuiParent = getGuiParent()
-pcall(function()
-    local old1 = targetGuiParent:FindFirstChild("AtomwareRivalsUI")
-    if old1 then old1:Destroy() end
-    if CoreGui then
-        local old2 = CoreGui:FindFirstChild("AtomwareRivalsUI")
-        if old2 then old2:Destroy() end
-    end
-    local pg = LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        local old3 = pg:FindFirstChild("AtomwareRivalsUI")
-        if old3 then old3:Destroy() end
-    end
-end)
-
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AtomwareRivalsUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 100
-ScreenGui.Parent = targetGuiParent
+ScreenGui.Parent = getGuiParent()
 
 if _G.AtomwareConfig then _G.AtomwareConfig:AttachUI(ScreenGui, "Desktop PC") end
 
@@ -354,12 +339,11 @@ Sidebar.Parent = MainFrame
 padding(Sidebar, 12, 12, 8, 8)
 
 local SidebarSep = Instance.new("Frame")
-SidebarSep.Name = "SidebarSep"
-SidebarSep.Size = UDim2.new(0, 1, 1, -46)
-SidebarSep.Position = UDim2.fromOffset(160, 46)
+SidebarSep.Size = UDim2.new(0, 1, 1, 0)
+SidebarSep.Position = UDim2.new(1, -1, 0, 0)
 SidebarSep.BackgroundColor3 = THEME.BorderDim
 SidebarSep.BorderSizePixel = 0
-SidebarSep.Parent = MainFrame
+SidebarSep.Parent = Sidebar
 
 local SidebarLayout = Instance.new("UIListLayout")
 SidebarLayout.Padding = UDim.new(0, 5)
@@ -486,17 +470,8 @@ local function createCard(page, title, side)
         cardParent = pageLayout.Columns[colIdx]
     end
 
-    local cardName = title .. "Card"
-    local existingCard = (cardParent and cardParent:FindFirstChild(cardName)) or page:FindFirstChild(cardName, true)
-    if existingCard then
-        local existingBody = existingCard:FindFirstChild("Body")
-        if existingBody then
-            return existingCard, existingBody
-        end
-    end
-
     local card = Instance.new("Frame")
-    card.Name = cardName
+    card.Name = title .. "Card"
     card.BackgroundColor3 = THEME.Card
     card.Size = UDim2.new(1, 0, 0, 0)
     card.AutomaticSize = Enum.AutomaticSize.Y
@@ -564,20 +539,10 @@ local function wrapSection(card, body, title)
         body = body,
         text = title,
         options = {},
-        toggleMap = {},
-        sliderMap = {},
-        dropdownMap = {},
-        keybindMap = {},
-        colorMap = {},
-        buttonMap = {},
     }
 
     function section:AddToggle(data)
         local text = data.text or ""
-        local tKey = string.lower(text)
-        if section.toggleMap[tKey] then
-            return section.toggleMap[tKey]
-        end
         local state = data.state == true
         local callback = data.callback
 
@@ -685,16 +650,11 @@ local function wrapSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = toggleObj })
-        section.toggleMap[tKey] = toggleObj
         return toggleObj
     end
 
     function section:AddSlider(data)
         local text = data.text or ""
-        local sKey = string.lower(text)
-        if section.sliderMap[sKey] then
-            return section.sliderMap[sKey]
-        end
         local min = data.min or 0
         local max = data.max or 100
         local inc = data.increment or 1
@@ -792,10 +752,6 @@ local function wrapSection(card, body, title)
 
     function section:AddList(data)
         local text = data.text or ""
-        local dKey = string.lower(text)
-        if section.dropdownMap[dKey] then
-            return section.dropdownMap[dKey]
-        end
         local values = data.values or {}
         local multi = data.multi == true
         local selected = data.selected or (multi and {} or values[1])
@@ -982,10 +938,8 @@ local function wrapSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = listObj })
-        section.dropdownMap[dKey] = listObj
         return listObj
     end
-    section.AddDropdown = function(self, d) return self:AddList(d) end
 
     function section:AddScrollList(data)
         return section:AddList(data)
@@ -993,10 +947,6 @@ local function wrapSection(card, body, title)
 
     function section:AddBind(data)
         local text = data.text or ""
-        local kKey = string.lower(text)
-        if section.keybindMap[kKey] then
-            return section.keybindMap[kKey]
-        end
         local bind = data.bind or "None"
         local keycallback = data.keycallback
         local bindName = typeof(bind) == "EnumItem" and bind.Name or tostring(bind)
@@ -1063,20 +1013,10 @@ local function wrapSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = bindObj })
-        section.keybindMap[kKey] = bindObj
         return bindObj
-    end
-    section.AddKeybind = function(self, d)
-        d.bind = d.bind or d.default
-        d.keycallback = d.keycallback or d.callback
-        return self:AddBind(d)
     end
 
     function section:AddColor(data)
-        local cKey = string.lower(data.text or "")
-        if section.colorMap[cKey] then
-            return section.colorMap[cKey]
-        end
         local text = data.text or ""
         local color = data.color or Color3.fromRGB(205, 104, 255)
         local callback = data.callback
@@ -1135,7 +1075,6 @@ local function wrapSection(card, body, title)
         end))
 
         table.insert(section.options, { row = row, obj = colorObj })
-        section.colorMap[cKey] = colorObj
         return colorObj
     end
 
@@ -1458,18 +1397,12 @@ function AtomwareWindow:AddTab(rawName, order)
         name = displayName,
         page = page,
         sections = {},
-        sectionMap = {},
     }
 
     function tabObj:AddSection(text, side, order)
-        local sKey = string.lower(text or "")
-        if tabObj.sectionMap[sKey] then
-            return tabObj.sectionMap[sKey]
-        end
         local card, body = createCard(page, text, side)
         local section = wrapSection(card, body, text)
         table.insert(tabObj.sections, section)
-        tabObj.sectionMap[sKey] = section
         return section
     end
 

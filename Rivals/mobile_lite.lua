@@ -146,27 +146,13 @@ local function getGuiParent()
     return playerGui or CoreGui
 end
 
-local targetGuiParent = getGuiParent()
-pcall(function()
-    local old1 = targetGuiParent:FindFirstChild("AtomwareMobileRivalsUI")
-    if old1 then old1:Destroy() end
-    if CoreGui then
-        local old2 = CoreGui:FindFirstChild("AtomwareMobileRivalsUI")
-        if old2 then old2:Destroy() end
-    end
-    local pg = LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        local old3 = pg:FindFirstChild("AtomwareMobileRivalsUI")
-        if old3 then old3:Destroy() end
-    end
-end)
-
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AtomwareMobileLiteUI"
+_G.AtomwareLiteMode = true
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 100
-ScreenGui.Parent = targetGuiParent
+ScreenGui.Parent = getGuiParent()
 
 if _G.AtomwareConfig then _G.AtomwareConfig:AttachUI(ScreenGui, "Mobile Touch") end
 
@@ -176,7 +162,7 @@ local activeDropdownCloser = nil
 
 -- Fullscreen click-blocker backdrop: sinks clicks when UI is open so game/background cannot be clicked
 local ClickBlocker = Instance.new("Frame")
-ClickBlocker.Name = "AtomwareMobileClickBlocker"
+ClickBlocker.Name = "AtomwareMobileLiteClickBlocker"
 ClickBlocker.Size = UDim2.new(1, 0, 1, 0)
 ClickBlocker.Position = UDim2.new(0, 0, 0, 0)
 ClickBlocker.BackgroundTransparency = 1
@@ -380,7 +366,7 @@ corner(HeaderAccent, 2)
 
 local Title = Instance.new("TextLabel")
 Title.BackgroundTransparency = 1
-Title.Text = "ATOMWARE  <font color=\"#cd68ff\">RIVALS</font>"
+Title.Text = "ATOMWARE  <font color=\"#cd68ff\">RIVALS</font> <font color=\"#2aff9d\">[LITE]</font>"
 Title.RichText = true
 Title.Size = UDim2.new(0.6, 0, 1, 0)
 Title.Position = UDim2.fromOffset(24, 0)
@@ -437,10 +423,9 @@ local TAB_ORDER = {
     ["Visuals"]   = 1,
     ["Combat"]    = 2,
     ["Movement"]  = 3,
-    ["World"]     = 4,
-    ["Cosmetics"] = 5,
-    ["Misc"]      = 6,
-    ["Settings"]  = 7,
+    ["Spoofing"]  = 4,
+    ["Misc"]      = 5,
+    ["Settings"]  = 6,
 }
 
 local Pages = {}
@@ -548,15 +533,242 @@ end
 
 local function normalizeTabName(name)
     local lower = string.lower(name)
-    if lower == "combat" or lower == "legit" or lower == "rage" then return "Combat", "🎯" end
+    if lower == "combat" or lower == "legit" or lower == "rage" then return "Combat", "⚔️" end
     if lower == "visuals" then return "Visuals", "👁️" end
     if lower == "move" or lower == "movement" then return "Movement", "🏃" end
-    if lower == "world" then return "World", "🌍" end
-    if lower == "items" or lower == "cosmetics" then return "Cosmetics", "🎨" end
+    if lower == "spoof" or lower == "spoofing" then return "Spoofing", "🎭" end
     if lower == "misc" then return "Misc", "🛠️" end
     if lower == "configs" or lower == "settings" then return "Settings", "⚙️" end
     return name:sub(1,1):upper() .. name:sub(2), "•"
 end
+
+--//==================================================
+--// LITEMODE HEADLESS / MOCK SECTION SYSTEM
+--//==================================================
+
+local function createMockButton()
+    local btn = { enabled = true, count = 1, buttons = {} }
+    function btn:AddButton(opts)
+        return createMockButton()
+    end
+    setmetatable(btn, {
+        __index = function(t, k)
+            return function(...) return btn end
+        end
+    })
+    return btn
+end
+
+local function createMockScrollList(opts)
+    local list = {
+        values = opts and opts.values or {},
+        selected = opts and opts.selected or "",
+        enabled = true,
+        scroll = 0,
+    }
+    function list:AddValue(val)
+        table.insert(list.values, val)
+    end
+    function list:SetValues(newVals)
+        list.values = newVals or {}
+    end
+    function list:ClearValues()
+        list.values = {}
+    end
+    function list:Select(val, skip)
+        list.selected = val
+        if not skip and opts and opts.callback then
+            pcall(opts.callback, val)
+        end
+    end
+    function list:SetText(txt) end
+
+    setmetatable(list, {
+        __index = function(t, k)
+            return function(...) return list end
+        end
+    })
+    return list
+end
+
+local function createMockSection(name)
+    local mockSec = { text = name, options = {}, subTab = "main" }
+
+    function mockSec:AddToggle(opts)
+        local state = opts and opts.state or false
+        local toggleObj = {
+            enabled = true,
+            state = state,
+            SetState = function(self, val, skip)
+                self.state = val
+                if not skip and opts and opts.callback then pcall(opts.callback, val) end
+            end,
+            AddColor = function(self)
+                return {
+                    color = Color3.new(1, 1, 1),
+                    SetColor = function() end,
+                }
+            end,
+            AddKeyPicker = function(self)
+                return {
+                    key = "None",
+                    SetKey = function() end,
+                }
+            end,
+        }
+        setmetatable(toggleObj, {
+            __index = function(t, k)
+                return function(...) return toggleObj end
+            end
+        })
+        return toggleObj
+    end
+
+    function mockSec:AddSlider(opts)
+        local val = opts and opts.default or 0
+        local sliderObj = {
+            enabled = true,
+            value = val,
+            SetValue = function(self, v, skip)
+                self.value = v
+                if not skip and opts and opts.callback then pcall(opts.callback, v) end
+            end,
+        }
+        setmetatable(sliderObj, {
+            __index = function(t, k)
+                return function(...) return sliderObj end
+            end
+        })
+        return sliderObj
+    end
+
+    function mockSec:AddDropdown(opts)
+        return createMockScrollList(opts)
+    end
+
+    function mockSec:AddList(opts)
+        return createMockScrollList(opts)
+    end
+
+    function mockSec:AddScrollList(opts)
+        return createMockScrollList(opts)
+    end
+
+    function mockSec:AddBox(opts)
+        local boxObj = {
+            enabled = true,
+            text = opts and opts.default or "",
+            SetInput = function() end,
+        }
+        setmetatable(boxObj, {
+            __index = function(t, k)
+                return function(...) return boxObj end
+            end
+        })
+        return boxObj
+    end
+
+    function mockSec:AddBind(opts)
+        local bindObj = {
+            enabled = true,
+            bind = opts and opts.bind or "None",
+            SetBind = function() end,
+        }
+        setmetatable(bindObj, {
+            __index = function(t, k)
+                return function(...) return bindObj end
+            end
+        })
+        return bindObj
+    end
+
+    function mockSec:AddColor(opts)
+        local colorObj = {
+            enabled = true,
+            color = opts and opts.default or Color3.new(1, 1, 1),
+            SetColor = function() end,
+        }
+        setmetatable(colorObj, {
+            __index = function(t, k)
+                return function(...) return colorObj end
+            end
+        })
+        return colorObj
+    end
+
+    function mockSec:AddButton(opts)
+        return createMockButton()
+    end
+
+    function mockSec:AddText(opts)
+        return { SetText = function() end }
+    end
+
+    function mockSec:AddSeparator()
+        return {}
+    end
+
+    function mockSec:UpdateOptions() end
+
+    setmetatable(mockSec, {
+        __index = function(t, k)
+            return function(...)
+                local dummy = {
+                    values = {},
+                    selected = nil,
+                    state = false,
+                    value = 0,
+                    text = "",
+                    enabled = true,
+                    count = 1,
+                    scroll = 0,
+                    AddButton = function() return createMockButton() end,
+                    AddValue = function() end,
+                    SetValues = function() end,
+                    ClearValues = function() end,
+                    SetText = function() end,
+                    SetState = function() end,
+                    SetValue = function() end,
+                    SetColor = function() end,
+                    SetBind = function() end,
+                    SetInput = function() end,
+                    Select = function() end,
+                    UpdateOptions = function() end,
+                }
+                setmetatable(dummy, {
+                    __index = function(dt, dk)
+                        return function(...) return dummy end
+                    end
+                })
+                return dummy
+            end
+        end
+    })
+    return mockSec
+end
+
+local mockTabObj = {
+    name = "MockTab",
+    sections = {},
+    AddSection = function(self, text, side, order)
+        return createMockSection(text)
+    end,
+    AddSubTabs = function() end,
+    UpdateSections = function() end,
+}
+
+setmetatable(mockTabObj, {
+    __index = function(t, k)
+        if k == "AddSection" then
+            return function(self, text, side, order)
+                return createMockSection(text)
+            end
+        end
+        return function(...)
+            return mockTabObj
+        end
+    end
+})
 
 --//==================================================
 --// CONTAINED CARD BUILDER
@@ -578,17 +790,8 @@ local function createMobileCard(page, title, side)
         cardParent = pageLayout.Columns[colIdx]
     end
 
-    local cardName = title .. "Card"
-    local existingCard = (cardParent and cardParent:FindFirstChild(cardName)) or page:FindFirstChild(cardName, true)
-    if existingCard then
-        local existingBody = existingCard:FindFirstChild("Body")
-        if existingBody then
-            return existingCard, existingBody
-        end
-    end
-
     local card = Instance.new("Frame")
-    card.Name = cardName
+    card.Name = title .. "Card"
     card.BackgroundColor3 = THEME.Card
     card.Size = UDim2.new(1, 0, 0, 0)
     card.AutomaticSize = Enum.AutomaticSize.Y
@@ -660,21 +863,11 @@ local function wrapMobileSection(card, body, title)
         body = body,
         text = title,
         options = {},
-        toggleMap = {},
-        sliderMap = {},
-        dropdownMap = {},
-        keybindMap = {},
-        colorMap = {},
-        scrollListMap = {},
     }
 
     -- 1. Contained Toggle
     function section:AddToggle(data)
         local text = data.text or ""
-        local tKey = string.lower(text)
-        if section.toggleMap[tKey] then
-            return section.toggleMap[tKey]
-        end
         local state = data.state == true
         local callback = data.callback
 
@@ -711,7 +904,7 @@ local function wrapMobileSection(card, body, title)
         knob.Parent = btn
         corner(knob, 7)
 
-        local toggleObj = { enabled = true }
+        local toggleObj = { enabled = true, state = state }
 
         local function setState(val, skipCallback)
             local newVal = (val == true)
@@ -719,6 +912,7 @@ local function wrapMobileSection(card, body, title)
                 return
             end
             state = newVal
+            toggleObj.state = state
             lbl.TextColor3 = state and THEME.Text or THEME.TextMuted
             if skipCallback then
                 btn.BackgroundColor3 = state and THEME.Accent or THEME.CardAlt
@@ -737,6 +931,19 @@ local function wrapMobileSection(card, body, title)
         function toggleObj:SetState(val, skipCallback)
             setState(val, skipCallback)
         end
+
+        function toggleObj:AddKeyPicker(spec)
+            return {
+                key = spec and spec.bind or "None",
+                SetKey = function() end,
+            }
+        end
+
+        setmetatable(toggleObj, {
+            __index = function(t, k)
+                return function(...) return toggleObj end
+            end
+        })
 
         function toggleObj:AddColor(spec)
             local col = spec.color or Color3.fromRGB(255, 255, 255)
@@ -784,17 +991,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = toggleObj })
-        section.toggleMap[tKey] = toggleObj
         return toggleObj
     end
 
     -- 2. Contained Slider
     function section:AddSlider(data)
         local text = data.text or ""
-        local sKey = string.lower(text)
-        if section.sliderMap[sKey] then
-            return section.sliderMap[sKey]
-        end
         local min = data.min or 0
         local max = data.max or 100
         local inc = data.increment or 1
@@ -885,18 +1087,19 @@ local function wrapMobileSection(card, body, title)
             setValue(newVal, skipCallback)
         end
 
+        setmetatable(sliderObj, {
+            __index = function(t, k)
+                return function(...) return sliderObj end
+            end
+        })
+
         table.insert(section.options, { row = row, obj = sliderObj })
-        section.sliderMap[sKey] = sliderObj
         return sliderObj
     end
 
     -- 3. Contained Dropdown (Accordion Expanding Container - Never Overlaps)
     function section:AddList(data)
         local text = data.text or ""
-        local dKey = string.lower(text)
-        if section.dropdownMap[dKey] then
-            return section.dropdownMap[dKey]
-        end
         local values = data.values or {}
         local multi = data.multi == true
         local selected = data.selected or (multi and {} or values[1])
@@ -1084,19 +1287,19 @@ local function wrapMobileSection(card, body, title)
             lbl.Text = newTxt
         end
 
+        setmetatable(listObj, {
+            __index = function(t, k)
+                return function(...) return listObj end
+            end
+        })
+
         table.insert(section.options, { row = row, obj = listObj })
-        section.dropdownMap[dKey] = listObj
         return listObj
     end
-    section.AddDropdown = function(self, d) return self:AddList(d) end
 
     -- 4. Contained ScrollList Widget (Searchable Contained List Box - Used for Weapons, Skins, Skyboxes, Sounds)
     function section:AddScrollList(data)
         local text = data.text or ""
-        local slKey = string.lower(text)
-        if section.scrollListMap[slKey] then
-            return section.scrollListMap[slKey]
-        end
         local values = data.values or {}
         local selected = tostring(data.selected or "")
         local callback = data.callback
@@ -1239,18 +1442,19 @@ local function wrapMobileSection(card, body, title)
             titleLbl.Text = newTxt
         end
 
+        setmetatable(scrollListObj, {
+            __index = function(t, k)
+                return function(...) return scrollListObj end
+            end
+        })
+
         table.insert(section.options, { row = container, obj = scrollListObj })
-        section.scrollListMap[slKey] = scrollListObj
         return scrollListObj
     end
 
     -- 5. Contained Keybind
     function section:AddBind(data)
         local text = data.text or ""
-        local kKey = string.lower(text)
-        if section.keybindMap[kKey] then
-            return section.keybindMap[kKey]
-        end
         local bind = data.bind or "None"
         local keycallback = data.keycallback
         local bindName = typeof(bind) == "EnumItem" and bind.Name or tostring(bind)
@@ -1379,22 +1583,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = bindObj })
-        section.keybindMap[kKey] = bindObj
         return bindObj
-    end
-    section.AddBind = function(self, d)
-        d.default = d.default or d.bind
-        d.callback = d.callback or d.keycallback
-        return self:AddKeybind(d)
     end
 
     -- 6. Contained ColorPicker
     function section:AddColor(data)
         local text = data.text or ""
-        local cKey = string.lower(text)
-        if section.colorMap[cKey] then
-            return section.colorMap[cKey]
-        end
         local color = data.color or Color3.fromRGB(205, 104, 255)
         local callback = data.callback
 
@@ -1453,7 +1647,6 @@ local function wrapMobileSection(card, body, title)
         end))
 
         table.insert(section.options, { row = row, obj = colorObj })
-        section.colorMap[cKey] = colorObj
         return colorObj
     end
 
@@ -1619,6 +1812,12 @@ local function wrapMobileSection(card, body, title)
             return box.Text
         end
 
+        setmetatable(boxObj, {
+            __index = function(t, k)
+                return function(...) return boxObj end
+            end
+        })
+
         table.insert(section.options, { row = row, obj = boxObj })
         return boxObj
     end
@@ -1654,6 +1853,14 @@ local function wrapMobileSection(card, body, title)
         end
     end
 
+    setmetatable(section, {
+        __index = function(t, k)
+            return function(...)
+                return createMockSection(title)
+            end
+        end
+    })
+
     return section
 end
 
@@ -1662,6 +1869,8 @@ end
 --//==================================================
 
 local AtomwareMobileWindow = {
+    name = "Atomware Mobile Lite",
+    isLiteMode = true,
     tabs = {},
     open = true,
     uiDragging = false,
@@ -1681,82 +1890,12 @@ function AtomwareMobileWindow:SwitchPage(name)
     self:SelectTab(name)
 end
 
-function AtomwareMobileWindow:AddTab(rawName, order)
-    local lower = string.lower(rawName or "")
-    if lower == "extras" then
-        local mockSec = {
-            card = Instance.new("Frame"),
-            body = Instance.new("Frame"),
-            text = "extras",
-            options = {},
-        }
-        setmetatable(mockSec, {
-            __index = function(t, k)
-                return function(...)
-                    local dummy = {
-                        values = {},
-                        selected = nil,
-                        state = false,
-                        value = 0,
-                        text = "",
-                        enabled = true,
-                        count = 1,
-                        scroll = 0,
-                        AddButton = function() return end,
-                        AddColor = function() return { SetColor = function() end } end,
-                        AddValue = function() end,
-                        SetValues = function() end,
-                        ClearValues = function() end,
-                        SetText = function() end,
-                        SetState = function() end,
-                        SetValue = function() end,
-                        SetColor = function() end,
-                        SetBind = function() end,
-                        SetInput = function() end,
-                        Select = function() end,
-                        UpdateOptions = function() end,
-                    }
-                    setmetatable(dummy, {
-                        __index = function(dt, dk)
-                            return function(...) return dummy end
-                        end
-                    })
-                    return dummy
-                end
-            end
-        })
-        local mockTabObj = {
-            name = "Extras",
-            sections = {},
-            AddSection = function(self, text, side, sOrder)
-                return mockSec
-            end,
-            AddSubTabs = function() end,
-            UpdateSections = function() end,
-        }
-        setmetatable(mockTabObj, {
-            __index = function(t, k)
-                if k == "AddSection" then
-                    return function(self, text, side, sOrder)
-                        return mockSec
-                    end
-                end
-                return function(...) return mockTabObj end
-            end
-        })
-        self.tabs[rawName] = mockTabObj
-        return mockTabObj
-    end
-    if lower == "spoofing" or lower == "spoof" then
-        return self:AddTab("misc")
-    end
-    local displayName, icon = normalizeTabName(rawName)
-    local existing = self.tabs[rawName] or self.tabs[displayName]
+function AtomwareMobileWindow:CreateRealTab(displayName, icon)
+    local existing = self.tabs[displayName]
     if existing then return existing end
 
     local page = getOrCreatePage(displayName)
 
-    -- Create Tab Button in Top Scrollable Tab Bar
     local btn = Instance.new("TextButton")
     btn.Name = displayName .. "Tab"
     btn.Size = UDim2.fromOffset(88, 28)
@@ -1772,26 +1911,28 @@ function AtomwareMobileWindow:AddTab(rawName, order)
     stroke(btn, THEME.BorderDim, 1)
 
     TabButtons[displayName] = btn
-    trackConnection(btn.MouseButton1Click:Connect(function()
+    local lastTabClick = 0
+    local function onTabClick()
+        local now = os.clock()
+        if now - lastTabClick < 0.12 then return end
+        lastTabClick = now
         switchPage(displayName)
-    end))
+    end
+    trackConnection(btn.MouseButton1Click:Connect(onTabClick))
+    trackConnection(btn.Activated:Connect(onTabClick))
 
     local tabObj = {
         name = displayName,
         page = page,
         sections = {},
-        sectionMap = {},
     }
 
     function tabObj:AddSection(text, side, order)
-        local sKey = string.lower(text or "")
-        if tabObj.sectionMap[sKey] then
-            return tabObj.sectionMap[sKey]
-        end
         local card, body = createMobileCard(page, text, side)
         local section = wrapMobileSection(card, body, text)
+        section.tab = tabObj
+        section.parentTab = tabObj
         table.insert(tabObj.sections, section)
-        tabObj.sectionMap[sKey] = section
         return section
     end
 
@@ -1803,9 +1944,127 @@ function AtomwareMobileWindow:AddTab(rawName, order)
         end
     end
 
-    self.tabs[rawName] = tabObj
     self.tabs[displayName] = tabObj
     return tabObj
+end
+
+function AtomwareMobileWindow:AddTab(rawName, order)
+    local lower = string.lower(rawName or "")
+
+    -- 1. Excluded Tabs in LiteMode: World, Cosmetics (items), Extras
+    if lower == "world" or lower == "items" or lower == "cosmetics" or lower == "extras" then
+        self.tabs[rawName] = mockTabObj
+        return mockTabObj
+    end
+
+    -- 2. Visuals Tab (Allowed: all visual elements except Style, Utility Style, and Hit Effects)
+    if lower == "visuals" then
+        local realTab = self.tabs["Visuals"] or self:CreateRealTab("Visuals", "👁️")
+        local visualsProxy = {
+            name = "Visuals",
+            page = realTab.page,
+            sections = realTab.sections,
+            AddSection = function(selfProxy, text, side, sOrder)
+                local sLower = string.lower(text or "")
+                if sLower == "style" or sLower:find("utility style") or sLower:find("hit effects") then
+                    return createMockSection(text)
+                end
+                return realTab:AddSection(text, side, sOrder)
+            end,
+            AddSubTabs = function() end,
+            UpdateSections = function() realTab:UpdateSections() end,
+        }
+        self.tabs[rawName] = visualsProxy
+        return visualsProxy
+    end
+
+    -- 3. Unified Combat Tab (Combines Silent Aim from Legit and Ragebot from Rage)
+    if lower == "legit" then
+        local combatTab = self.tabs["Combat"] or self:CreateRealTab("Combat", "⚔️")
+        local legitProxy = {
+            name = "Combat",
+            page = combatTab.page,
+            sections = combatTab.sections,
+            AddSection = function(selfProxy, text, side, sOrder)
+                local sLower = string.lower(text or "")
+                -- Retain Silent Aim in Left Column (side 1)
+                if sLower:find("silent") then
+                    return combatTab:AddSection(text, 1, sOrder)
+                end
+                -- Headless mock for legit aimbot and triggerbot in LiteMode
+                return createMockSection(text)
+            end,
+            AddSubTabs = function() end,
+            UpdateSections = function() combatTab:UpdateSections() end,
+        }
+        self.tabs[rawName] = legitProxy
+        return legitProxy
+    end
+
+    if lower == "rage" then
+        local combatTab = self.tabs["Combat"] or self:CreateRealTab("Combat", "⚔️")
+        local rageProxy = {
+            name = "Combat",
+            page = combatTab.page,
+            sections = combatTab.sections,
+            AddSection = function(selfProxy, text, side, sOrder)
+                local sLower = string.lower(text or "")
+                -- Retain Ragebot in Right Column (side 2)
+                if sLower:find("rage") then
+                    return combatTab:AddSection(text, 2, sOrder)
+                end
+                -- Headless mock for extra visualizers / evasion
+                return createMockSection(text)
+            end,
+            AddSubTabs = function() end,
+            UpdateSections = function() combatTab:UpdateSections() end,
+        }
+        self.tabs[rawName] = rageProxy
+        return rageProxy
+    end
+
+    -- 4. Dedicated Spoofing Tab
+    if lower == "spoofing" or lower == "spoof" then
+        local spoofTab = self.tabs["Spoofing"] or self:CreateRealTab("Spoofing", "🎭")
+        self.tabs[rawName] = spoofTab
+        self.tabs["Spoofing"] = spoofTab
+        self.tabs["spoofing"] = spoofTab
+        return spoofTab
+    end
+
+    -- 5. Misc Tab & Fallback Spoofing Routing
+    if lower == "misc" then
+        local realMiscTab = self.tabs["Misc"] or self:CreateRealTab("Misc", "🛠️")
+        local spoofTab = self.tabs["Spoofing"] or self:CreateRealTab("Spoofing", "🎭")
+        local miscProxy = {
+            name = "Misc",
+            page = realMiscTab.page,
+            sections = realMiscTab.sections,
+            AddSection = function(selfProxy, text, side, sOrder)
+                local sLower = string.lower(text or "")
+                if sLower == "profile" or sLower == "rank" or sLower == "device" or sLower:find("spoof") or sLower:find("queue") then
+                    return spoofTab:AddSection(text, side, sOrder)
+                end
+                return realMiscTab:AddSection(text, side, sOrder)
+            end,
+            AddSubTabs = function() end,
+            UpdateSections = function()
+                realMiscTab:UpdateSections()
+                spoofTab:UpdateSections()
+            end,
+        }
+        self.tabs[rawName] = miscProxy
+        return miscProxy
+    end
+
+    -- 5. Movement, Spoofing, Settings
+    local displayName, icon = normalizeTabName(rawName)
+    local existing = self.tabs[rawName] or self.tabs[displayName]
+    if existing then return existing end
+    local tab = self:CreateRealTab(displayName, icon)
+    self.tabs[rawName] = tab
+    self.tabs[displayName] = tab
+    return tab
 end
 
 function AtomwareMobileWindow:UpdateTabs()
@@ -1822,7 +2081,6 @@ end
 
 _G.AtomwareWindow = AtomwareMobileWindow
 _G.AtomwareUILoaded = true
-
 _G.AtomwareIsLiteMode = true
 
 return AtomwareMobileWindow

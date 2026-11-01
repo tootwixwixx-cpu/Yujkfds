@@ -499,15 +499,11 @@ local function createDrawingKit(bridge: any): any
 
 	function kit.tab(name: string): any
 		bridge.tabs = bridge.tabs or {}
-		local lower = string.lower(name)
-		if lower == "combat" or lower == "legit" or lower == "rage" then
-			if bridge.tabs["Combat"] then return bridge.tabs["Combat"] end
-			if bridge.tabs["combat"] then return bridge.tabs["combat"] end
-		end
 		local existing = bridge.tabs[name]
 		if existing then
 			return existing
 		end
+		local lower = string.lower(name)
 		local created: any
 		if lower == "spoof" or lower == "spoofing" then
 			if _G.AtomwareIsLiteMode then
@@ -519,12 +515,6 @@ local function createDrawingKit(bridge: any): any
 			created = bridge.menu:AddTab(name)
 		end
 		bridge.tabs[name] = created
-		if lower == "combat" or lower == "legit" or lower == "rage" then
-			bridge.tabs["Combat"] = created
-			bridge.tabs["combat"] = created
-			bridge.tabs["legit"] = created
-			bridge.tabs["rage"] = created
-		end
 		return created
 	end
 
@@ -1165,7 +1155,6 @@ export type Window = {
 			weaponWireframe = false,
 			armWireframe = false,
 			wireframeOnly = false,
-			noRecoilAnimation = false,
 		},
 		AmbienceTracks = { "city", "forest", "rain", "snow" },
 		HitSounds = {
@@ -1210,8 +1199,6 @@ export type Window = {
 	}
 
 	DrawingBridge.builders.cosmetics = function(kit: any)
-		if DrawingBridge.cosmeticsBuilt then return end
-		DrawingBridge.cosmeticsBuilt = true
 		pcall(function()
 			Cosmetics:install()
 		end)
@@ -1924,8 +1911,6 @@ export type Window = {
 	end
 
 	DrawingBridge.builders.esp = function(kit: any)
-		if DrawingBridge.espBuilt then return end
-		DrawingBridge.espBuilt = true
 		local tab = kit.tab("visuals")
 		pcall(function()
 			tab:AddSubTabs({ "players", "utility", "extra bs" })
@@ -9227,9 +9212,6 @@ Bitstream Vera
 			local manipActive = Silent.manipulation == true
 			if Silent.enabled then
 				local lock = silentTarget()
-				if (Silent.hitChance or 100) < 100 and math.random(1, 100) > (Silent.hitChance or 100) then
-					lock = nil
-				end
 				if manipActive then
 					if lock then
 						local camPos = cam.CFrame.Position
@@ -14474,8 +14456,6 @@ Bitstream Vera
 		end
 
 		DrawingBridge.builders.combat = function(kit: any)
-			if DrawingBridge.combatBuilt then return end
-			DrawingBridge.combatBuilt = true
 			local function nudge(_value: any?)
 				local fn = DrawingBridge.nudgeExploits
 				if fn then
@@ -14549,8 +14529,6 @@ local silent = combatTab:AddSection("silent aim", 1)
 				end,
 			})
 			local sAcc = kit.number(silent, "accuracy", Silent, "accuracy", 10, 100, 1, { suffix = "%" })
-			local sHitChance = kit.number(silent, "hit chance", Silent, "hitChance", 1, 100, 1, { suffix = "%" })
-			local sAngleManip = kit.flag(silent, "bullet angle manipulation", Silent, "angleManipulation")
 			local sVis = kit.flag(silent, "visible check", Silent, "visibleCheck", nil, function()
 				Silent.flags.visible = Silent.visibleCheck == true
 			end)
@@ -20008,8 +19986,6 @@ Flick.enabled = false
 		end
 
 		DrawingBridge.builders.world = function(kit: any)
-			if DrawingBridge.worldBuilt then return end
-			DrawingBridge.worldBuilt = true
 			pcall(function()
 				local function rebuild()
 					pcall(rebuildCrosshair)
@@ -23864,12 +23840,6 @@ Flick.enabled = false
 			viewclass.SetCFrame = function(self: any, cf: any, ...: any)
 				if ClientFx.viewmodel and typeof(cf) == "CFrame" then
 					cf = cf * userViewOffset()
-				end
-				if ClientFx.noRecoilAnimation then
-					pcall(function()
-						if self._recoilSpring then self._recoilSpring:Reset() end
-						if self._unrecoil_spring then self._unrecoil_spring:Reset() end
-					end)
 				end
 				return oldSet(self, cf, ...)
 			end

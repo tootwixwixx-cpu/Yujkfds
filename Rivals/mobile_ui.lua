@@ -146,27 +146,12 @@ local function getGuiParent()
     return playerGui or CoreGui
 end
 
-local targetGuiParent = getGuiParent()
-pcall(function()
-    local old1 = targetGuiParent:FindFirstChild("AtomwareMobileRivalsUI")
-    if old1 then old1:Destroy() end
-    if CoreGui then
-        local old2 = CoreGui:FindFirstChild("AtomwareMobileRivalsUI")
-        if old2 then old2:Destroy() end
-    end
-    local pg = LocalPlayer and LocalPlayer:FindFirstChildOfClass("PlayerGui")
-    if pg then
-        local old3 = pg:FindFirstChild("AtomwareMobileRivalsUI")
-        if old3 then old3:Destroy() end
-    end
-end)
-
 local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AtomwareMobileRivalsUI"
 ScreenGui.ResetOnSpawn = false
 ScreenGui.ZIndexBehavior = Enum.ZIndexBehavior.Sibling
 ScreenGui.DisplayOrder = 100
-ScreenGui.Parent = targetGuiParent
+ScreenGui.Parent = getGuiParent()
 
 if _G.AtomwareConfig then _G.AtomwareConfig:AttachUI(ScreenGui, "Mobile Touch") end
 
@@ -578,17 +563,8 @@ local function createMobileCard(page, title, side)
         cardParent = pageLayout.Columns[colIdx]
     end
 
-    local cardName = title .. "Card"
-    local existingCard = (cardParent and cardParent:FindFirstChild(cardName)) or page:FindFirstChild(cardName, true)
-    if existingCard then
-        local existingBody = existingCard:FindFirstChild("Body")
-        if existingBody then
-            return existingCard, existingBody
-        end
-    end
-
     local card = Instance.new("Frame")
-    card.Name = cardName
+    card.Name = title .. "Card"
     card.BackgroundColor3 = THEME.Card
     card.Size = UDim2.new(1, 0, 0, 0)
     card.AutomaticSize = Enum.AutomaticSize.Y
@@ -660,21 +636,11 @@ local function wrapMobileSection(card, body, title)
         body = body,
         text = title,
         options = {},
-        toggleMap = {},
-        sliderMap = {},
-        dropdownMap = {},
-        keybindMap = {},
-        colorMap = {},
-        scrollListMap = {},
     }
 
     -- 1. Contained Toggle
     function section:AddToggle(data)
         local text = data.text or ""
-        local tKey = string.lower(text)
-        if section.toggleMap[tKey] then
-            return section.toggleMap[tKey]
-        end
         local state = data.state == true
         local callback = data.callback
 
@@ -784,17 +750,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = toggleObj })
-        section.toggleMap[tKey] = toggleObj
         return toggleObj
     end
 
     -- 2. Contained Slider
     function section:AddSlider(data)
         local text = data.text or ""
-        local sKey = string.lower(text)
-        if section.sliderMap[sKey] then
-            return section.sliderMap[sKey]
-        end
         local min = data.min or 0
         local max = data.max or 100
         local inc = data.increment or 1
@@ -886,17 +847,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = sliderObj })
-        section.sliderMap[sKey] = sliderObj
         return sliderObj
     end
 
     -- 3. Contained Dropdown (Accordion Expanding Container - Never Overlaps)
     function section:AddList(data)
         local text = data.text or ""
-        local dKey = string.lower(text)
-        if section.dropdownMap[dKey] then
-            return section.dropdownMap[dKey]
-        end
         local values = data.values or {}
         local multi = data.multi == true
         local selected = data.selected or (multi and {} or values[1])
@@ -1085,18 +1041,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = listObj })
-        section.dropdownMap[dKey] = listObj
         return listObj
     end
-    section.AddDropdown = function(self, d) return self:AddList(d) end
 
     -- 4. Contained ScrollList Widget (Searchable Contained List Box - Used for Weapons, Skins, Skyboxes, Sounds)
     function section:AddScrollList(data)
         local text = data.text or ""
-        local slKey = string.lower(text)
-        if section.scrollListMap[slKey] then
-            return section.scrollListMap[slKey]
-        end
         local values = data.values or {}
         local selected = tostring(data.selected or "")
         local callback = data.callback
@@ -1240,17 +1190,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = container, obj = scrollListObj })
-        section.scrollListMap[slKey] = scrollListObj
         return scrollListObj
     end
 
     -- 5. Contained Keybind
     function section:AddBind(data)
         local text = data.text or ""
-        local kKey = string.lower(text)
-        if section.keybindMap[kKey] then
-            return section.keybindMap[kKey]
-        end
         local bind = data.bind or "None"
         local keycallback = data.keycallback
         local bindName = typeof(bind) == "EnumItem" and bind.Name or tostring(bind)
@@ -1379,22 +1324,12 @@ local function wrapMobileSection(card, body, title)
         end
 
         table.insert(section.options, { row = row, obj = bindObj })
-        section.keybindMap[kKey] = bindObj
         return bindObj
-    end
-    section.AddBind = function(self, d)
-        d.default = d.default or d.bind
-        d.callback = d.callback or d.keycallback
-        return self:AddKeybind(d)
     end
 
     -- 6. Contained ColorPicker
     function section:AddColor(data)
         local text = data.text or ""
-        local cKey = string.lower(text)
-        if section.colorMap[cKey] then
-            return section.colorMap[cKey]
-        end
         local color = data.color or Color3.fromRGB(205, 104, 255)
         local callback = data.callback
 
@@ -1453,7 +1388,6 @@ local function wrapMobileSection(card, body, title)
         end))
 
         table.insert(section.options, { row = row, obj = colorObj })
-        section.colorMap[cKey] = colorObj
         return colorObj
     end
 
@@ -1780,18 +1714,12 @@ function AtomwareMobileWindow:AddTab(rawName, order)
         name = displayName,
         page = page,
         sections = {},
-        sectionMap = {},
     }
 
     function tabObj:AddSection(text, side, order)
-        local sKey = string.lower(text or "")
-        if tabObj.sectionMap[sKey] then
-            return tabObj.sectionMap[sKey]
-        end
         local card, body = createMobileCard(page, text, side)
         local section = wrapMobileSection(card, body, text)
         table.insert(tabObj.sections, section)
-        tabObj.sectionMap[sKey] = section
         return section
     end
 
