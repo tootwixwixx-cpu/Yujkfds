@@ -460,17 +460,12 @@ local function loadModule(path)
         return true
     end
     local candidates = {
-        cleanName,
-        cleanName .. ".txt",
         cleanName .. ".lua",
-        path
+        path,
+        cleanName
     }
-    if cleanName == "features" then
-        table.insert(candidates, 1, "fetaures.txt")
-        table.insert(candidates, 2, "fetaures")
-    elseif cleanName == "fetaures" then
-        table.insert(candidates, 1, "features.txt")
-        table.insert(candidates, 2, "features")
+    if cleanName == "features" or cleanName == "fetaures" then
+        candidates = { "features.lua", "features" }
     end
 
     -- 1. In-Memory Virtual File System (Fastest & offline)
